@@ -1,0 +1,21 @@
+{
+  "name": "LuxeRentals CRM",
+  "short_name": "LuxeRentals",
+  "description": "Light Luxury CRM for Clothing Rentals",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FAF8F5",
+  "theme_color": "#FAF8F5",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiB2aWV3Qm94PSIwIDAgMTkyIDE5MiIgZmlsbD0ibm9uZSI+PHJlY3Qgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiIGZpbGw9IiNGQUY4RjUiLz48Y2lyY2xlIGN4PSI5NiIgY3k9Ijk2IiByPSI1MCIgZmlsbD0iI0I1OTE1RiIvPjwvc3ZnPg==",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgNTEyIDUxMiIgZmlsbD0ibm9uZSI+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9IiNGQUY4RjUiLz48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNTYiIHI9IjEyMCIgZmlsbD0iI0I1OTE1RiIvPjwvc3ZnPg==",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

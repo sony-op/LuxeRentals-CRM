@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Mobile Native App Meta Tags -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#FAF8F5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="LuxeRentals">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="./manifest.json">
+  <title>LUXERENTALS | Light Luxury CRM</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { serif: ['"Playfair Display"', 'serif'], sans: ['"Inter"', 'sans-serif'] } } }
+    }
+  </script>
+  <style>
+    body { 
+      background-color: #FAF8F5; 
+      margin: 0; 
+      color: #2D2825; 
+      -webkit-user-select: none; /* Make it feel like a native app */
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Hide scrollbar for cleaner look */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #C6A87C; border-radius: 10px; }
+    
+    .gold-gradient-text {
+      background: linear-gradient(to right, #B5915F, #D8C3A5);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .gold-gradient-bg {
+      background: linear-gradient(135deg, #C6A87C, #E8D3B9);
+    }
+    .soft-shadow {
+      box-shadow: 0 10px 40px rgba(181, 145, 95, 0.08);
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+    }
+    .glass-btn {
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 0 8px 32px rgba(181, 145, 95, 0.1);
+      transition: all 0.3s ease;
+    }
+    .glass-btn:hover {
+      background: rgba(255, 255, 255, 0.7);
+    }
+    .glass-btn-primary {
+      background: linear-gradient(135deg, rgba(181, 145, 95, 0.75), rgba(216, 195, 165, 0.75));
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 0 8px 32px rgba(181, 145, 95, 0.25);
+      transition: all 0.3s ease;
+    }
+    .glass-btn-primary:hover {
+      background: linear-gradient(135deg, rgba(181, 145, 95, 0.9), rgba(216, 195, 165, 0.9));
+      box-shadow: 0 8px 32px rgba(181, 145, 95, 0.35);
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  
+  <script type="importmap">
+    {
+      "imports": { "react": "https://esm.sh/react@18.2.0", "react-dom/client": "https://esm.sh/react-dom@18.2.0/client", "lucide-react": "https://esm.sh/lucide-react@0.292.0" }
+    }
+  </script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module">
+    import React, { useState } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { Home, BarChart2, PlusCircle, Package, Award, Upload, X, CheckCircle, IndianRupee, Phone, Calendar, User, ChevronRight, CalendarDays, ClipboardList, Search } from 'lucide-react';
+
+    const INITIAL_INVENTORY = [
+      { id: 1, name: 'Royal Jodhpuri Sherwani', category: 'Sherwani', size: 'L', price: 1500, image: null, rentCount: 12 },
+      { id: 2, name: 'Classic Navy Blue Suit', category: 'Suit', size: '42', price: 1000, image: null, rentCount: 8 },
+      { id: 3, name: 'Indo-Western Silk Kurta', category: 'Western', size: 'M', price: 800, image: null, rentCount: 15 },
+    ];
+    const INITIAL_RENTS = [
+      { id: 101, customerName: 'Rahul Kumar', phone: '9876543210', item: INITIAL_INVENTORY[0], rentDate: '2026-03-18', returnDate: '2026-03-21', totalRent: 4500, pendingAmount: 1500, status: 'active' },
+      { id: 102, customerName: 'Aman Singh', phone: '8765432109', item: INITIAL_INVENTORY[1], rentDate: '2026-03-19', returnDate: '2026-03-20', totalRent: 2000, pendingAmount: 0, status: 'active' }
+    ];
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('Home');
+      const [inventory, setInventory] = useState(INITIAL_INVENTORY);
+      const [rents, setRents] = useState(INITIAL_RENTS);
+      const [draftItemId, setDraftItemId] = useState('');
+      const [userRole, setUserRole] = useState('Admin');
+
+      const activeRents = rents.filter(r => r.status === 'active');
+      const totalActiveRents = activeRents.length;
+      const totalPendingAmount = activeRents.reduce((acc, curr) => acc + curr.pendingAmount, 0);
+
+      const payPending = (id) => setRents(rents.map(r => r.id === id ? { ...r, pendingAmount: 0 } : r));
+      const markReturned = (id) => {
+        setRents(rents.map(r => r.id === id ? { ...r, status: 'returned' } : r));
+        const returnedRent = rents.find(r => r.id === id);
+        if (returnedRent) setInventory(inventory.map(inv => inv.id === returnedRent.item.id ? { ...inv, rentCount: inv.rentCount + 1 } : inv));
+      };
+
+      // Styles
+      const accentGold = "#B5915F";
+      const textPrimary = "#2D2825";
+      const textSecondary = "#7A736A";
+
+      const renderHome = () => (
+        <div className="p-6 space-y-8 pb-32">
+          {/* Luxury Overview Cards */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="glass-card soft-shadow p-6 rounded-[2rem] flex flex-col justify-between relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-white to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <p className="text-[#8C8477] text-[10px] uppercase tracking-[0.2em] font-medium mb-4 z-10">Active Rents</p>
+              <div className="flex items-end justify-between z-10">
+                <h3 className="text-4xl font-serif text-[#2D2825] tracking-wide">{totalActiveRents}</h3>
+                <Package className="text-[#B5915F] w-5 h-5 stroke-[1.5] mb-1" />
+              </div>
+            </div>
+            
+            <div className="glass-card soft-shadow p-6 rounded-[2rem] flex flex-col justify-between relative overflow-hidden border-[#C6A87C]/20 border">
+              <div className="absolute -right-4 -top-4 w-20 h-20 bg-[#C6A87C]/10 rounded-full blur-2xl"></div>
+              <p className="text-[#B5915F] text-[10px] uppercase tracking-[0.2em] font-medium mb-4 z-10">Pending Dues</p>
+              <div className="flex items-end justify-between z-10">
+                <h3 className="text-2xl font-serif text-[#B5915F] tracking-wide relative -left-1">
+                  <span className="text-sm align-top font-sans opacity-70">₹</span>{totalPendingAmount}
+                </h3>
+                <IndianRupee className="text-[#B5915F] w-4 h-4 stroke-[2] mb-1" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-[#8C8477] text-xs font-serif tracking-[0.25em] uppercase mb-6 flex items-center gap-3">
+              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C6A87C]/60"></span>
+              All Active Rentals
+              <span className="flex-1 h-[1px] bg-gradient-to-l from-transparent to-[#C6A87C]/30"></span>
+            </h2>
+            
+            <div className="space-y-5">
+              {activeRents.length === 0 ? (
+                <p className="text-[#8C8477] text-center py-12 font-serif italic tracking-wider">No active rentals right now.</p>
+              ) : activeRents.map(rent => (
+                <div key={rent.id} className="glass-card soft-shadow rounded-[2rem] p-6 relative overflow-hidden group border border-[#C6A87C]/10 hover:border-[#C6A87C]/30 transition-colors">
+                  <div className="absolute top-0 right-0 p-4 opacity-[0.03] pointer-events-none group-hover:scale-110 transition-transform duration-700">
+                    <Award className="w-32 h-32 text-[#B5915F]" />
+                  </div>
+
+                  <div className="flex justify-between items-start border-b border-[#EAE2D6] pb-5 mb-5 relative z-10">
+                    <div>
+                      <h4 className="font-serif text-[#2D2825] text-xl tracking-wider">{rent.customerName}</h4>
+                      <p className="text-[#B5915F] text-[10px] font-medium tracking-[0.1em] flex items-center gap-1.5 mt-2 uppercase">
+                        <Phone className="w-3 h-3 stroke-[1.5]" /> {rent.phone}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="bg-[#FAF8F5] border border-[#EAE2D6] text-[#6A6359] px-4 py-1.5 rounded-full text-[9px] uppercase tracking-[0.2em] font-medium shadow-sm">
+                        {rent.item.name}
+                      </span>
+                      <p className="text-[#D96B6B] text-[10px] font-semibold tracking-widest mt-4 flex items-center justify-end gap-1.5 uppercase">
+                        <Calendar className="w-3 h-3 stroke-[2]" /> Due {rent.returnDate}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3 relative z-10 px-1">
+                    <div className="flex justify-between items-center text-[11px] tracking-widest uppercase">
+                      <span className="text-[#8C8477]">Total Rent</span>
+                      <span className="text-[#2D2825] font-serif tracking-widest font-semibold">₹{rent.totalRent}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px] tracking-widest uppercase">
+                      <span className="text-[#8C8477]">Pending</span>
+                      <span className={`font-serif tracking-widest font-bold ${rent.pendingAmount > 0 ? 'text-[#B5915F]' : 'text-[#8DBA9C]'}`}>
+                        ₹{rent.pendingAmount}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 mt-8 relative z-10">
+                    {rent.pendingAmount > 0 && (
+                      <button 
+                        onClick={() => {
+                          if (userRole !== 'Admin') {
+                            alert('Permission Denied: Only Admins can clear payments.');
+                            return;
+                          }
+                          payPending(rent.id);
+                        }}
+                        className={`flex-1 text-[10px] tracking-[0.2em] uppercase py-3.5 rounded-xl transition-all text-center font-semibold ${userRole === 'Admin' ? 'glass-btn text-[#A67E48] active:scale-95' : 'bg-white/30 backdrop-blur-sm border border-white/40 text-[#AFAAA3] cursor-not-allowed opacity-70'}`}
+                      >
+                        {userRole === 'Admin' ? 'Clear Dues' : 'Restricted'}
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => markReturned(rent.id)}
+                      className="flex-1 glass-btn-primary text-white text-[10px] tracking-[0.2em] uppercase py-3.5 rounded-xl transition-all active:scale-95 flex justify-center items-center gap-2 font-bold"
+                    >
+                      <CheckCircle className="w-4 h-4 stroke-[2.5]" /> Returned
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+
+      const CalendarTab = () => {
+        // Find most recent rent date to default to, or today's date
+        const defaultDate = rents.length > 0 
+          ? [...rents].sort((a, b) => new Date(b.rentDate) - new Date(a.rentDate))[0].rentDate 
+          : new Date().toISOString().split('T')[0];
+          
+        const [selectedDate, setSelectedDate] = useState(defaultDate);
+        const rentsOnDate = rents.filter(r => r.rentDate === selectedDate);
+        
+        return (
+          <div className="p-6 pb-32 space-y-6">
+            <h2 className="text-[#8C8477] text-xs font-serif tracking-[0.2em] uppercase flex items-center gap-3 mb-8">
+              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C6A87C]/50"></span>
+              Date Explorer
+            </h2>
+
+            <div className="glass-card soft-shadow rounded-[2rem] p-6 text-center border-[#C6A87C]/20 mb-10 bg-gradient-to-br from-white to-[#FAF8F5]">
+              <label className="text-[10px] tracking-[0.2em] uppercase text-[#A67E48] mb-4 font-bold block flex justify-center items-center gap-2">
+                <CalendarDays className="w-3.5 h-3.5 stroke-[2]"/> Select a Date
+              </label>
+              <input 
+                type="date" 
+                className="w-full bg-white border border-[#C6A87C]/40 rounded-xl px-4 py-4 text-[#2D2825] focus:border-[#C6A87C] outline-none text-center font-serif text-lg shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all cursor-pointer"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+              />
+            </div>
+
+            <h3 className="text-[#A67E48] font-bold text-[11px] tracking-[0.2em] uppercase mb-5 pl-3 border-l-[3px] border-[#B5915F] flex items-center justify-between">
+              <span className="flex items-center gap-2"><ClipboardList className="w-3.5 h-3.5 stroke-[2]"/> Outgoing on this Day</span>
+              <span className="bg-[#FAF8F5] px-3 py-1 rounded-full border border-[#EAE2D6] text-[#8C8477] text-[9px] font-sans tracking-widest">{rentsOnDate.length}</span>
+            </h3>
+
+            {rentsOnDate.length === 0 ? (
+              <p className="text-[#8C8477] text-center py-16 font-serif italic tracking-wider">No items were rented out on this date.</p>
+            ) : (
+              <div className="space-y-4">
+                {rentsOnDate.map(rent => (
+                  <div key={rent.id} className="glass-card soft-shadow rounded-[1.5rem] p-5 relative overflow-hidden border border-[#C6A87C]/10 hover:border-[#C6A87C]/30 transition-colors group">
+                    
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="font-serif text-[#2D2825] text-lg tracking-wider font-semibold">{rent.customerName}</h4>
+                        <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[8px] uppercase tracking-[0.25em] font-bold shadow-sm ${rent.status === 'active' ? 'bg-[#FAF6EC] text-[#B5915F] border border-[#C6A87C]/30' : 'bg-[#F2F8F4] text-[#6A9576] border border-[#8DBA9C]/40'}`}>
+                          {rent.status}
+                        </span>
+                      </div>
+                      <div className="text-right max-w-[50%]">
+                        <span className="bg-[#FAF8F5] border border-[#EAE2D6] text-[#6A6359] px-3 py-1 rounded-full text-[8px] uppercase tracking-[0.2em] font-bold block mb-2 truncate" title={rent.item.name}>
+                          {rent.item.name}
+                        </span>
+                        <p className="text-[#D96B6B] text-[8px] font-bold tracking-widest uppercase flex items-center justify-end gap-1 pt-1 opacity-90">
+                          Due: {rent.returnDate}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 pt-3 border-t border-[#EAE2D6]/70">
+                      <div className="flex justify-between items-center text-[10px] tracking-widest uppercase">
+                        <span className="text-[#8C8477]">Total Value</span>
+                        <span className="text-[#2D2825] font-serif tracking-widest font-semibold text-sm">₹{rent.totalRent}</span>
+                      </div>
+                      {rent.pendingAmount > 0 && rent.status === 'active' && (
+                        <div className="flex justify-between items-center text-[10px] tracking-widest uppercase">
+                          <span className="text-[#B5915F] font-bold">Pending Dues</span>
+                          <span className="font-serif tracking-widest font-bold text-[#B5915F] text-[13px]">₹{rent.pendingAmount}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      const NewRentForm = () => {
+        const [formData, setFormData] = useState({ customerName: '', phone: '', itemId: draftItemId, rentDate: '', returnDate: '', totalRent: '', advancePaid: '' });
+        const [idProof, setIdProof] = useState(null);
+
+        // Mobile Verification State
+        const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+        const [showOtpInput, setShowOtpInput] = useState(false);
+        const [otp, setOtp] = useState('');
+        const [isVerifying, setIsVerifying] = useState(false);
+
+        const activeItemIds = rents.filter(r => r.status === 'active').map(r => r.item.id);
+        const availableInventory = inventory.filter(item => !activeItemIds.includes(item.id));
+
+        const handleImageUpload = (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => setIdProof(reader.result);
+            reader.readAsDataURL(file);
+          }
+        };
+
+        const handleSubmit = (e) => {
+          e.preventDefault();
+          if (!isPhoneVerified) return alert('Please verify the contact number first!');
+          const item = inventory.find(i => i.id === parseInt(formData.itemId));
+          if (!item) return alert('Please select an item!');
+          const total = parseInt(formData.totalRent || 0);
+          const advance = parseInt(formData.advancePaid || 0);
+
+          setRents([...rents, {
+            id: Date.now(), customerName: formData.customerName, phone: formData.phone, item,
+            rentDate: formData.rentDate, returnDate: formData.returnDate, totalRent: total, pendingAmount: total - advance, status: 'active', idProof
+          }]);
+          setDraftItemId('');
+          setActiveTab('Home');
+        };
+
+        const InputClass = "w-full bg-white/70 border border-[#C6A87C]/20 rounded-2xl px-5 py-4 text-[#2D2825] placeholder-[#B5915F]/40 focus:border-[#C6A87C] focus:ring-1 focus:ring-[#C6A87C]/40 focus:bg-white outline-none transition-all text-sm tracking-wide font-medium shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]";
+        const LabelClass = "block text-[10px] tracking-[0.2em] uppercase text-[#7A736A] mb-2.5 font-bold ml-1";
+
+        return (
+          <div className="p-6 pb-32">
+            <h2 className="text-[#8C8477] text-xs font-serif tracking-[0.2em] uppercase mb-8 flex items-center gap-3">
+              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C6A87C]/50"></span>
+              New Booking
+            </h2>
+
+            <div className="glass-card soft-shadow border-[#C6A87C]/20 rounded-[2rem] p-7 relative">
+              
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label className={LabelClass}>Client Name</label>
+                  <input required type="text" className={InputClass} placeholder="Enter full name"
+                    value={formData.customerName} onChange={e => setFormData({...formData, customerName: e.target.value})} />
+                </div>
+                <div>
+                  <label className={LabelClass}>Contact Number</label>
+                  <div className="flex gap-3">
+                    <input required type="tel" className={`${InputClass} flex-1`} placeholder="+91"
+                      value={formData.phone} 
+                      onChange={e => {
+                        setFormData({...formData, phone: e.target.value});
+                        setIsPhoneVerified(false);
+                        setShowOtpInput(false);
+                        setOtp('');
+                      }} 
+                      disabled={isPhoneVerified}
+                    />
+                    {!isPhoneVerified && formData.phone.length >= 10 && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if(!showOtpInput) {
+                            setShowOtpInput(true);
+                          } else if(otp.length >= 4) {
+                            setIsVerifying(true);
+                            setTimeout(() => {
+                              setIsVerifying(false);
+                              setIsPhoneVerified(true);
+                              setShowOtpInput(false);
+                            }, 800);
+                          }
+                        }}
+                        className={`glass-btn text-[#A67E48] px-5 rounded-2xl font-bold tracking-[0.2em] text-[10px] uppercase transition-all ${showOtpInput && otp.length < 4 ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+                        disabled={showOtpInput && otp.length < 4}
+                      >
+                        {isVerifying ? '...' : showOtpInput ? 'Verify' : 'Send OTP'}
+                      </button>
+                    )}
+                    {isPhoneVerified && (
+                      <div className="bg-[#FAF8F5] border border-[#EAE2D6] px-5 rounded-2xl flex items-center justify-center shadow-sm">
+                        <CheckCircle className="w-5 h-5 text-[#8DBA9C]" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {showOtpInput && !isPhoneVerified && (
+                    <div className="mt-4 p-5 rounded-2xl bg-gradient-to-br from-[#FAF8F5] to-white border border-[#C6A87C]/30 shadow-inner block animate-[fadeIn_0.3s_ease-out]">
+                      <label className="block text-[9px] tracking-[0.2em] uppercase text-[#B5915F] mb-3 font-bold ml-1 text-center">
+                        Enter 4-digit OTP (Simulated)
+                      </label>
+                      <input 
+                        type="text" 
+                        maxLength="4"
+                        className="w-full bg-white/70 border border-[#C6A87C]/40 rounded-xl px-4 py-3 text-[#2D2825] focus:border-[#C6A87C] outline-none text-center font-serif text-2xl tracking-[0.7em] shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all"
+                        placeholder="••••"
+                        value={otp}
+                        onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                      />
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  <label className={LabelClass}>Identity Document</label>
+                  {idProof ? (
+                    <div className="relative rounded-2xl overflow-hidden border border-[#C6A87C]/30 shadow-md group">
+                      <img src={idProof} alt="ID Preview" className="w-full h-40 object-cover transition-all group-hover:scale-105" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                      <button type="button" onClick={() => setIdProof(null)} className="absolute top-3 right-3 bg-white/80 backdrop-blur border border-[#EAE2D6] p-2.5 rounded-full text-[#2D2825] hover:bg-white transition-all hover:scale-110 shadow-sm">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-36 border border-dashed border-[#C6A87C]/40 bg-white/50 hover:bg-white transition-colors rounded-2xl cursor-pointer group shadow-sm">
+                      <div className="w-12 h-12 rounded-full border border-[#C6A87C]/20 bg-[#FAF8F5] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-[0_4px_10px_rgba(181,145,95,0.1)]">
+                        <Upload className="w-5 h-5 text-[#B5915F] stroke-[1.5]" />
+                      </div>
+                      <p className="text-[10px] tracking-[0.2em] text-[#B5915F]/80 uppercase font-bold">Capture or Upload ID</p>
+                    </label>
+                  )}
+                </div>
+
+                <div>
+                  <label className={LabelClass}>Select Garment</label>
+                  <select required className={`${InputClass} appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23B5915F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:1.2em] bg-[right_1rem_center] bg-no-repeat pr-12`}
+                    value={formData.itemId} onChange={e => setFormData({...formData, itemId: e.target.value})}>
+                    <option value="" className="text-[#6A6359]">-- Choose from Collection --</option>
+                    {availableInventory.map(item => <option key={item.id} value={item.id}>{item.name} - ₹{item.price}/day</option>)}
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className={LabelClass}>Rent Date</label>
+                    <input required type="date" className={InputClass}
+                      value={formData.rentDate} onChange={e => setFormData({...formData, rentDate: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className={LabelClass}>Return Date</label>
+                    <input required type="date" className={InputClass}
+                      value={formData.returnDate} onChange={e => setFormData({...formData, returnDate: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5 pt-2">
+                  <div>
+                    <label className={LabelClass}>Total Price</label>
+                    <div className="relative">
+                      <IndianRupee className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F]/70 stroke-[2]" />
+                      <input required type="number" className={`${InputClass} pl-12 font-serif text-lg`} placeholder="0"
+                        value={formData.totalRent} onChange={e => setFormData({...formData, totalRent: e.target.value})} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={LabelClass}>Advance</label>
+                    <div className="relative">
+                      <IndianRupee className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F]/70 stroke-[2]" />
+                      <input required type="number" className={`${InputClass} pl-12 font-serif text-lg`} placeholder="0"
+                        value={formData.advancePaid} onChange={e => setFormData({...formData, advancePaid: e.target.value})} />
+                    </div>
+                  </div>
+                </div>
+
+                <button type="submit" 
+                  disabled={!isPhoneVerified}
+                  className={`w-full font-bold tracking-[0.2em] uppercase text-[11px] rounded-2xl mt-10 transition-all flex justify-center items-center gap-2 h-14 ${isPhoneVerified ? 'glass-btn-primary text-white active:scale-95' : 'bg-white/30 backdrop-blur-sm border border-white/40 text-[#AFAAA3] cursor-not-allowed'}`}>
+                   {isPhoneVerified ? 'Confirm Booking' : 'Verify Phone to Book'} 
+                   {isPhoneVerified && <ChevronRight className="w-4 h-4 stroke-[2.5]"/>}
+                </button>
+              </form>
+            </div>
+          </div>
+        );
+      };
+
+      const StockTab = () => {
+        const [showAddForm, setShowAddForm] = useState(false);
+        const [searchQuery, setSearchQuery] = useState('');
+        
+        const activeItemIds = rents.filter(r => r.status === 'active').map(r => r.item.id);
+        const availableInventory = inventory.filter(item => !activeItemIds.includes(item.id));
+
+        const filteredInventory = availableInventory.filter(item => 
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+          item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.size.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        return (
+          <div className="p-6 pb-32 space-y-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-[#8C8477] text-xs font-serif tracking-[0.2em] uppercase flex items-center gap-3">
+                <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C6A87C]/50"></span>
+                Collection
+              </h2>
+              <button onClick={() => setShowAddForm(!showAddForm)} className="glass-btn text-[#A67E48] px-5 py-2.5 rounded-full flex items-center gap-2 transition-all text-[9px] tracking-[0.2em] font-bold uppercase">
+                {showAddForm ? <X className="w-3 h-3 stroke-[2]"/> : <PlusCircle className="w-3 h-3 stroke-[2]"/>}
+                {showAddForm ? 'Cancel' : 'New Piece'}
+              </button>
+            </div>
+
+            <div className="relative mb-8">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F] stroke-[2]" />
+              <input 
+                type="text" 
+                placeholder="Search by name, category, or size..." 
+                className="w-full bg-white/70 border border-[#C6A87C]/30 rounded-2xl pl-12 pr-5 py-4 text-[#2D2825] placeholder-[#B5915F]/40 focus:border-[#C6A87C] focus:bg-white outline-none transition-all text-sm tracking-wide shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {showAddForm && <AddItemForm onAdd={(newItem) => { setInventory([...inventory, newItem]); setShowAddForm(false); }} />}
+
+            {filteredInventory.length === 0 ? (
+              <p className="text-[#8C8477] text-center py-12 font-serif italic tracking-wider">No matching items found.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-5">
+                {filteredInventory.map(item => (
+                <div key={item.id} className="glass-card soft-shadow rounded-[2rem] p-5 flex gap-5 items-center relative overflow-hidden group border border-[#C6A87C]/10 hover:border-[#C6A87C]/30 transition-all">
+                  
+                  <div className="w-24 h-32 bg-[#FAF8F5] rounded-[1.5rem] flex-shrink-0 overflow-hidden border border-[#EAE2D6] relative z-10 shadow-inner group-hover:border-[#C6A87C]/30 transition-colors">
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-white to-[#FAF8F5]">
+                         <Package className="w-10 h-10 text-[#C6A87C]/20 mb-1 stroke-[1]" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 flex flex-col py-2.5 relative z-10 h-32">
+                    <span className="text-[8px] uppercase font-bold text-[#A67E48] tracking-[0.3em] mb-2 block">
+                      {item.category} <span className="text-[#EAE2D6] mx-1">|</span> {item.size}
+                    </span>
+                    <h3 className="font-serif text-[#2D2825] text-xl leading-tight font-medium">{item.name}</h3>
+                    
+                    <div className="flex items-end justify-between mt-auto">
+                      <div>
+                        <p className="text-[#B5915F] font-serif text-lg tracking-wider font-semibold">
+                          <span className="text-xs align-top font-sans mr-0.5 opacity-80">₹</span>{item.price}
+                        </p>
+                        <p className="text-[8px] text-[#A67E48]/60 tracking-widest uppercase mt-0.5 font-semibold">Per Day</p>
+                      </div>
+                      
+                      <button 
+                        onClick={() => { setDraftItemId(item.id.toString()); setActiveTab('New'); }}
+                        className="glass-btn text-[#A67E48] text-[9px] tracking-[0.2em] uppercase font-bold px-4 py-2.5 rounded-xl active:scale-95"
+                      >
+                        Rent Now
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            )}
+          </div>
+        );
+      };
+
+      const AddItemForm = ({ onAdd }) => {
+        const [newItem, setNewItem] = useState({ name: '', category: 'Sherwani', size: '', price: '' });
+        const [itemImg, setItemImg] = useState(null);
+        const handlePhotoUpload = (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => setItemImg(reader.result);
+            reader.readAsDataURL(file);
+          }
+        };
+        const submit = (e) => { e.preventDefault(); onAdd({ ...newItem, id: Date.now(), image: itemImg, rentCount: 0 }); };
+
+        const InputClass = "w-full bg-white/70 border border-[#C6A87C]/30 rounded-xl px-5 py-4 text-[#2D2825] placeholder-[#B5915F]/40 focus:border-[#C6A87C] outline-none transition-all text-sm tracking-wide shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]";
+
+        return (
+          <form onSubmit={submit} className="bg-gradient-to-br from-white to-[#FAF8F5] rounded-[2rem] p-7 border border-[#C6A87C]/30 relative z-10 soft-shadow mb-8 shadow-inner">
+            <h3 className="font-serif text-[#B5915F] text-center mb-6 text-xl tracking-widest">Add Exquisite Piece</h3>
+            <div className="space-y-5">
+              <div className="mb-4">
+                {itemImg ? (
+                   <div className="relative w-32 h-40 rounded-2xl overflow-hidden border border-[#EAE2D6] shadow-md mx-auto">
+                    <img src={itemImg} alt="Preview" className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => setItemImg(null)} className="absolute top-2 right-2 bg-white/80 p-2 rounded-full text-[#2D2825] backdrop-blur hover:bg-white transition-colors shadow-sm"><X className="w-3 h-3"/></button>
+                   </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center border border-dashed border-[#C6A87C]/40 bg-white px-4 py-8 rounded-2xl text-[10px] text-[#A67E48] font-bold tracking-[0.2em] uppercase cursor-pointer hover:bg-[#FAF8F5] transition-colors mx-auto w-40 h-40 shadow-sm">
+                    <Upload className="w-6 h-6 mb-3 stroke-[1.5] text-[#C6A87C]"/>
+                    Upload Image
+                    <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
+                  </label>
+                )}
+              </div>
+              <input required type="text" placeholder="Title (e.g. Ivory Tuxedo)" className={InputClass} 
+                value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4">
+                <select className={`${InputClass} appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23B5915F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:1em] bg-[right_1rem_center] bg-no-repeat`}
+                  value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})}>
+                  <option>Sherwani</option>
+                  <option>Suit</option>
+                  <option>Western</option>
+                </select>
+                <input required type="text" placeholder="Size / Fit" className={InputClass} 
+                  value={newItem.size} onChange={e => setNewItem({...newItem, size: e.target.value})} />
+              </div>
+              <input required type="number" placeholder="Price per Day" className={InputClass} 
+                value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} />
+              
+              <button type="submit" className="w-full glass-btn text-[#A67E48] font-bold tracking-[0.2em] uppercase py-4 rounded-xl mt-4 text-[10px] active:scale-95">
+                Add to Collection
+              </button>
+            </div>
+          </form>
+        );
+      };
+
+      const AnalyticsTab = () => {
+        const totalBookings = rents.length;
+        const totalRevenue = rents.reduce((sum, r) => sum + r.totalRent, 0);
+        
+        const sortedInventory = [...inventory].sort((a,b) => b.rentCount - a.rentCount);
+        const maxRents = Math.max(...sortedInventory.map(i => i.rentCount), 1); 
+        const topPerformer = sortedInventory[0];
+
+        return (
+          <div className="p-6 pb-32 space-y-8">
+            <h2 className="text-[#8C8477] text-xs font-serif tracking-[0.2em] uppercase flex items-center gap-3">
+              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C6A87C]/50"></span>
+              Overview
+            </h2>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="glass-card soft-shadow border-[#C6A87C]/10 p-6 rounded-[2rem] relative overflow-hidden group">
+                <div className="absolute -right-6 -top-6 w-24 h-24 bg-[#C6A87C]/5 rounded-full blur-2xl"></div>
+                <p className="text-[#8C8477] text-[10px] tracking-[0.2em] uppercase font-bold mb-3">Bookings</p>
+                <h3 className="text-4xl font-serif text-[#2D2825]">{totalBookings}</h3>
+              </div>
+              <div className="glass-card soft-shadow border-[#C6A87C]/30 p-6 rounded-[2rem] relative overflow-hidden bg-gradient-to-br from-[#FAF8F5] to-white">
+                <div className="absolute -left-6 -bottom-6 w-24 h-24 bg-[#E8D3B9]/30 rounded-full blur-2xl"></div>
+                <p className="text-[#A67E48] text-[10px] tracking-[0.2em] uppercase font-bold mb-3">Revenue</p>
+                <h3 className="text-3xl font-serif text-[#B5915F]">₹{totalRevenue}</h3>
+              </div>
+            </div>
+
+            {topPerformer && topPerformer.rentCount > 0 && (
+              <div className="relative mt-10">
+                <div className="absolute inset-x-4 -inset-y-2 bg-gradient-to-r from-[#C6A87C] to-[#E8D3B9] rounded-[2rem] blur-[20px] opacity-20"></div>
+                <div className="bg-white border border-[#C6A87C]/30 rounded-[2rem] p-8 soft-shadow relative overflow-hidden z-10">
+                  <div className="absolute right-0 top-0 w-32 h-32 bg-[radial-gradient(circle_at_top_right,_rgba(198,168,124,0.15)_0%,_transparent_70%)]"></div>
+                  
+                  <div className="flex items-center gap-4 mb-8 relative z-10">
+                    <div className="bg-[#FAF8F5] p-4 rounded-full border border-[#EAE2D6] shadow-sm">
+                      <Award className="w-7 h-7 text-[#B5915F] stroke-[1.5]" />
+                    </div>
+                    <div>
+                      <h3 className="text-[9px] uppercase tracking-[0.4em] text-[#A67E48] font-bold mb-1">Most Desired</h3>
+                      <p className="text-[#8C8477] text-[10px] uppercase tracking-widest font-serif italic">Top Performer</p>
+                    </div>
+                  </div>
+
+                  <h2 className="text-4xl font-serif leading-tight mb-5 relative z-10 tracking-wider text-[#2D2825]">{topPerformer.name}</h2>
+                  
+                  <div className="inline-flex items-center gap-3 bg-[#FAF8F5] border border-[#EAE2D6] px-5 py-2.5 rounded-full relative z-10 mt-2 shadow-sm">
+                    <span className="w-2 h-2 rounded-full bg-[#B5915F] shadow-[0_0_8px_rgba(181,145,95,0.6)] animate-pulse"></span>
+                    <p className="text-[#6A6359] text-[10px] uppercase font-bold tracking-[0.2em]">
+                      Rented {topPerformer.rentCount} Times
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="glass-card soft-shadow rounded-[2rem] p-7 mt-8 border-[#EAE2D6]">
+              <h3 className="text-[#8C8477] font-serif tracking-widest text-sm uppercase mb-8 flex items-center gap-3">
+                <BarChart2 className="w-4 h-4 text-[#C6A87C] stroke-[1.5]"/> Performance
+              </h3>
+              <div className="space-y-6">
+                {sortedInventory.map((item, idx) => {
+                  const percentage = (item.rentCount / maxRents) * 100;
+                  return (
+                    <div key={item.id} className="group">
+                      <div className="flex justify-between items-end mb-3">
+                        <span className="font-serif text-[#6A6359] tracking-wide text-sm truncate pr-4 group-hover:text-[#2D2825] transition-colors font-medium">
+                          <span className="text-[#C6A87C] text-xs mr-3 font-sans font-bold">0{idx+1}.</span> 
+                          {item.name}
+                        </span>
+                        <span className="text-[#B5915F] font-serif pr-1 font-semibold">{item.rentCount}</span>
+                      </div>
+                      <div className="w-full bg-[#FAF8F5] rounded-full h-1.5 overflow-hidden shadow-inner flex">
+                        <div 
+                          className="gold-gradient-bg h-full rounded-full transition-all duration-1000 ease-out relative" 
+                          style={{ width: `${percentage}%` }}
+                        >
+                          <div className="absolute right-0 top-0 bottom-0 w-8 bg-white/40 blur-[4px]"></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div className="min-h-screen relative max-w-md mx-auto shadow-[0_0_60px_rgba(0,0,0,0.1)] overflow-x-hidden bg-[#FAF8F5]">
+          
+          <div className="fixed inset-0 pointer-events-none z-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmYiLz48cmVjdCB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZjBmMGYwIi8+PC9zdmc+')] opacity-50 mix-blend-multiply"></div>
+          <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-transparent to-transparent z-0 pointer-events-none"></div>
+
+          {/* Superior Light Header */}
+          <div className="sticky top-0 z-50 bg-white/70 backdrop-blur-2xl border-b border-[#EAE2D6] px-6 py-5 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-2">
+              <Award className="w-4 h-4 text-[#B5915F] stroke-[1]" />
+              <h1 className="text-[16px] tracking-[0.25em] font-serif gold-gradient-text font-bold mt-0.5">
+                LUXE<span className="text-[#8C8477] font-sans tracking-[0.3em] font-medium text-[9px] ml-1">RENTALS</span>
+              </h1>
+            </div>
+            <button 
+              onClick={() => setUserRole(userRole === 'Admin' ? 'Team' : 'Admin')}
+              className="glass-btn px-4 py-2 rounded-full flex justify-center items-center cursor-pointer gap-2"
+            >
+              <User className="w-3 h-3 text-[#B5915F] stroke-[2]" />
+              <span className="text-[9px] font-bold text-[#A67E48] tracking-widest uppercase">{userRole}</span>
+            </button>
+          </div>
+
+          <main className="min-h-[calc(100vh-140px)] relative z-10 container mx-auto">
+            {activeTab === 'Home' && renderHome()}
+            {activeTab === 'Calendar' && <CalendarTab />}
+            {activeTab === 'New' && <NewRentForm />}
+            {activeTab === 'Stock' && <StockTab />}
+            {activeTab === 'Reports' && <AnalyticsTab />}
+          </main>
+
+          {/* Floating Light Premium Bottom Nav */}
+          <div className="fixed bottom-6 left-6 right-6 max-w-[calc(28rem-3rem)] mx-auto bg-white/90 backdrop-blur-2xl border border-[#EAE2D6] shadow-[0_20px_40px_rgba(181,145,95,0.15)] rounded-[2rem] px-5 py-3.5 flex justify-between items-center z-50">
+            <button onClick={() => setActiveTab('Home')} className={`flex flex-col items-center p-2 w-[18%] transition-all duration-300 ${activeTab === 'Home' ? 'text-[#B5915F] scale-110 drop-shadow-[0_2px_4px_rgba(181,145,95,0.3)]' : 'text-[#AFAAA3] hover:text-[#8C8477]'}`}>
+              <Home className={`w-5 h-5 ${activeTab === 'Home' ? 'stroke-[2]' : 'stroke-[1.5]'}`} />
+            </button>
+            <button onClick={() => setActiveTab('Calendar')} className={`flex flex-col items-center p-2 w-[18%] transition-all duration-300 ${activeTab === 'Calendar' ? 'text-[#B5915F] scale-110 drop-shadow-[0_2px_4px_rgba(181,145,95,0.3)]' : 'text-[#AFAAA3] hover:text-[#8C8477]'}`}>
+              <CalendarDays className={`w-5 h-5 ${activeTab === 'Calendar' ? 'stroke-[2]' : 'stroke-[1.5]'}`} />
+            </button>
+            
+            <button 
+              onClick={() => setActiveTab('New')} 
+              className="glass-btn-primary border-[3px] border-white/60 text-white w-[60px] h-[60px] rounded-full hover:scale-105 active:scale-95 flex items-center justify-center z-10 absolute left-1/2 -translate-x-1/2 -top-6"
+            >
+              <PlusCircle className="w-6 h-6 stroke-[2]" />
+            </button>
+            <div className="w-[18%]"></div> {/* Spacer for symmetry */}
+            
+            <button onClick={() => setActiveTab('Stock')} className={`flex flex-col items-center p-2 w-[18%] transition-all duration-300 ${activeTab === 'Stock' ? 'text-[#B5915F] scale-110 drop-shadow-[0_2px_4px_rgba(181,145,95,0.3)]' : 'text-[#AFAAA3] hover:text-[#8C8477]'}`}>
+              <Package className={`w-5 h-5 ${activeTab === 'Stock' ? 'stroke-[2]' : 'stroke-[1.5]'}`} />
+            </button>
+            <button onClick={() => setActiveTab('Reports')} className={`flex flex-col items-center p-2 w-[18%] transition-all duration-300 ${activeTab === 'Reports' ? 'text-[#B5915F] scale-110 drop-shadow-[0_2px_4px_rgba(181,145,95,0.3)]' : 'text-[#AFAAA3] hover:text-[#8C8477]'}`}>
+              <BarChart2 className={`w-5 h-5 ${activeTab === 'Reports' ? 'stroke-[2]' : 'stroke-[1.5]'}`} />
+            </button>
+          </div>
+
+        </div>
+      );
+    }
+
+    const root = createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
