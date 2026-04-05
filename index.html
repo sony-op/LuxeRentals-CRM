@@ -100,6 +100,455 @@
       { id: 102, customerName: 'Aman Singh', phone: '8765432109', item: INITIAL_INVENTORY[1], rentDate: '2026-03-19', returnDate: '2026-03-20', totalRent: 2000, pendingAmount: 0, status: 'active' }
     ];
 
+    const CalendarTab = ({ rents }) => {
+      // Find most recent rent date to default to, or today's date
+      const defaultDate = rents.length > 0 
+        ? [...rents].sort((a, b) => new Date(b.rentDate) - new Date(a.rentDate))[0].rentDate 
+        : new Date().toISOString().split('T')[0];
+        
+      const [selectedDate, setSelectedDate] = useState(defaultDate);
+      const rentsOnDate = rents.filter(r => r.rentDate === selectedDate);
+      
+      return (
+        <div className="p-6 pb-32 space-y-6">
+          <h2 className="text-[#8C8477] text-xs font-serif tracking-[0.2em] uppercase flex items-center gap-3 mb-8">
+            <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C6A87C]/50"></span>
+            Date Explorer
+          </h2>
+
+          <div className="glass-card soft-shadow rounded-[2rem] p-6 text-center border-[#C6A87C]/20 mb-10 bg-gradient-to-br from-white to-[#FAF8F5]">
+            <label className="text-[10px] tracking-[0.2em] uppercase text-[#A67E48] mb-4 font-bold block flex justify-center items-center gap-2">
+              <CalendarDays className="w-3.5 h-3.5 stroke-[2]"/> Select a Date
+            </label>
+            <input 
+              type="date" 
+              className="w-full bg-white border border-[#C6A87C]/40 rounded-xl px-4 py-4 text-[#2D2825] focus:border-[#C6A87C] outline-none text-center font-serif text-lg shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all cursor-pointer"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+            />
+          </div>
+
+          <h3 className="text-[#A67E48] font-bold text-[11px] tracking-[0.2em] uppercase mb-5 pl-3 border-l-[3px] border-[#B5915F] flex items-center justify-between">
+            <span className="flex items-center gap-2"><ClipboardList className="w-3.5 h-3.5 stroke-[2]"/> Outgoing on this Day</span>
+            <span className="bg-[#FAF8F5] px-3 py-1 rounded-full border border-[#EAE2D6] text-[#8C8477] text-[9px] font-sans tracking-widest">{rentsOnDate.length}</span>
+          </h3>
+
+          {rentsOnDate.length === 0 ? (
+            <p className="text-[#8C8477] text-center py-16 font-serif italic tracking-wider">No items were rented out on this date.</p>
+          ) : (
+            <div className="space-y-4">
+              {rentsOnDate.map(rent => (
+                <div key={rent.id} className="glass-card soft-shadow rounded-[1.5rem] p-5 relative overflow-hidden border border-[#C6A87C]/10 hover:border-[#C6A87C]/30 transition-colors group">
+                  
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h4 className="font-serif text-[#2D2825] text-lg tracking-wider font-semibold">{rent.customerName}</h4>
+                      <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[8px] uppercase tracking-[0.25em] font-bold shadow-sm ${rent.status === 'active' ? 'bg-[#FAF6EC] text-[#B5915F] border border-[#C6A87C]/30' : 'bg-[#F2F8F4] text-[#6A9576] border border-[#8DBA9C]/40'}`}>
+                        {rent.status}
+                      </span>
+                    </div>
+                    <div className="text-right max-w-[50%]">
+                      <span className="bg-[#FAF8F5] border border-[#EAE2D6] text-[#6A6359] px-3 py-1 rounded-full text-[8px] uppercase tracking-[0.2em] font-bold block mb-2 truncate" title={rent.item.name}>
+                        {rent.item.name}
+                      </span>
+                      <p className="text-[#D96B6B] text-[8px] font-bold tracking-widest uppercase flex items-center justify-end gap-1 pt-1 opacity-90">
+                        Due: {rent.returnDate}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-3 border-t border-[#EAE2D6]/70">
+                    <div className="flex justify-between items-center text-[10px] tracking-widest uppercase">
+                      <span className="text-[#8C8477]">Total Value</span>
+                      <span className="text-[#2D2825] font-serif tracking-widest font-semibold text-sm">₹{rent.totalRent}</span>
+                    </div>
+                    {rent.pendingAmount > 0 && rent.status === 'active' && (
+                      <div className="flex justify-between items-center text-[10px] tracking-widest uppercase">
+                        <span className="text-[#B5915F] font-bold">Pending Dues</span>
+                        <span className="font-serif tracking-widest font-bold text-[#B5915F] text-[13px]">₹{rent.pendingAmount}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const NewRentForm = ({ inventory, rents, setRents, draftItemId, setDraftItemId, setActiveTab }) => {
+      const [formData, setFormData] = useState({ customerName: '', phone: '', itemId: draftItemId, rentDate: '', returnDate: '', totalRent: '', advancePaid: '' });
+      const [idProof, setIdProof] = useState(null);
+
+      // Mobile Verification State
+      const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+      const [showOtpInput, setShowOtpInput] = useState(false);
+      const [otp, setOtp] = useState('');
+      const [isVerifying, setIsVerifying] = useState(false);
+
+      const activeItemIds = rents.filter(r => r.status === 'active').map(r => r.item.id);
+      const availableInventory = inventory.filter(item => !activeItemIds.includes(item.id));
+
+      const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => setIdProof(reader.result);
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!isPhoneVerified) return alert('Please verify the contact number first!');
+        const item = inventory.find(i => i.id === parseInt(formData.itemId));
+        if (!item) return alert('Please select an item!');
+        const total = parseInt(formData.totalRent || 0);
+        const advance = parseInt(formData.advancePaid || 0);
+
+        setRents([...rents, {
+          id: Date.now(), customerName: formData.customerName, phone: formData.phone, item,
+          rentDate: formData.rentDate, returnDate: formData.returnDate, totalRent: total, pendingAmount: total - advance, status: 'active', idProof
+        }]);
+        setDraftItemId('');
+        setActiveTab('Home');
+      };
+
+      const InputClass = "w-full bg-white/70 border border-[#C6A87C]/20 rounded-2xl px-5 py-4 text-[#2D2825] placeholder-[#B5915F]/40 focus:border-[#C6A87C] focus:ring-1 focus:ring-[#C6A87C]/40 focus:bg-white outline-none transition-all text-sm tracking-wide font-medium shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]";
+      const LabelClass = "block text-[10px] tracking-[0.2em] uppercase text-[#7A736A] mb-2.5 font-bold ml-1";
+
+      return (
+        <div className="p-6 pb-32">
+          <h2 className="text-[#8C8477] text-xs font-serif tracking-[0.2em] uppercase mb-8 flex items-center gap-3">
+            <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C6A87C]/50"></span>
+            New Booking
+          </h2>
+
+          <div className="glass-card soft-shadow border-[#C6A87C]/20 rounded-[2rem] p-7 relative">
+            
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label className={LabelClass}>Client Name</label>
+                <input required type="text" className={InputClass} placeholder="Enter full name"
+                  value={formData.customerName} onChange={e => setFormData({...formData, customerName: e.target.value})} />
+              </div>
+              <div>
+                <label className={LabelClass}>Contact Number</label>
+                <div className="flex gap-3">
+                  <input required type="tel" className={`${InputClass} flex-1`} placeholder="+91"
+                    value={formData.phone} 
+                    onChange={e => {
+                      setFormData({...formData, phone: e.target.value});
+                      setIsPhoneVerified(false);
+                      setShowOtpInput(false);
+                      setOtp('');
+                    }} 
+                    disabled={isPhoneVerified}
+                  />
+                  {!isPhoneVerified && formData.phone.length >= 10 && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        if(!showOtpInput) {
+                          setShowOtpInput(true);
+                        } else if(otp.length >= 4) {
+                          setIsVerifying(true);
+                          setTimeout(() => {
+                            setIsVerifying(false);
+                            setIsPhoneVerified(true);
+                            setShowOtpInput(false);
+                          }, 800);
+                        }
+                      }}
+                      className={`glass-btn text-[#A67E48] px-5 rounded-2xl font-bold tracking-[0.2em] text-[10px] uppercase transition-all ${showOtpInput && otp.length < 4 ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+                      disabled={showOtpInput && otp.length < 4}
+                    >
+                      {isVerifying ? '...' : showOtpInput ? 'Verify' : 'Send OTP'}
+                    </button>
+                  )}
+                  {isPhoneVerified && (
+                    <div className="bg-[#FAF8F5] border border-[#EAE2D6] px-5 rounded-2xl flex items-center justify-center shadow-sm">
+                      <CheckCircle className="w-5 h-5 text-[#8DBA9C]" />
+                    </div>
+                  )}
+                </div>
+                
+                {showOtpInput && !isPhoneVerified && (
+                  <div className="mt-4 p-5 rounded-2xl bg-gradient-to-br from-[#FAF8F5] to-white border border-[#C6A87C]/30 shadow-inner block animate-[fadeIn_0.3s_ease-out]">
+                    <label className="block text-[9px] tracking-[0.2em] uppercase text-[#B5915F] mb-3 font-bold ml-1 text-center">
+                      Enter 4-digit OTP (Simulated)
+                    </label>
+                    <input 
+                      type="text" 
+                      maxLength="4"
+                      className="w-full bg-white/70 border border-[#C6A87C]/40 rounded-xl px-4 py-3 text-[#2D2825] focus:border-[#C6A87C] outline-none text-center font-serif text-2xl tracking-[0.7em] shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all"
+                      placeholder="••••"
+                      value={otp}
+                      onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                    />
+                  </div>
+                )}
+              </div>
+              
+              <div>
+                <label className={LabelClass}>Identity Document</label>
+                {idProof ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-[#C6A87C]/30 shadow-md group">
+                    <img src={idProof} alt="ID Preview" className="w-full h-40 object-cover transition-all group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                    <button type="button" onClick={() => setIdProof(null)} className="absolute top-3 right-3 bg-white/80 backdrop-blur border border-[#EAE2D6] p-2.5 rounded-full text-[#2D2825] hover:bg-white transition-all hover:scale-110 shadow-sm">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-36 border border-dashed border-[#C6A87C]/40 bg-white/50 hover:bg-white transition-colors rounded-2xl cursor-pointer group shadow-sm">
+                    <div className="w-12 h-12 rounded-full border border-[#C6A87C]/20 bg-[#FAF8F5] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-[0_4px_10px_rgba(181,145,95,0.1)]">
+                      <Upload className="w-5 h-5 text-[#B5915F] stroke-[1.5]" />
+                    </div>
+                    <p className="text-[10px] tracking-[0.2em] text-[#B5915F]/80 uppercase font-bold">Capture or Upload ID</p>
+                  </label>
+                )}
+              </div>
+
+              <div>
+                <label className={LabelClass}>Select Garment</label>
+                <select required className={`${InputClass} appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23B5915F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:1.2em] bg-[right_1rem_center] bg-no-repeat pr-12`}
+                  value={formData.itemId} onChange={e => setFormData({...formData, itemId: e.target.value})}>
+                  <option value="" className="text-[#6A6359]">-- Choose from Collection --</option>
+                  {availableInventory.map(item => <option key={item.id} value={item.id}>{item.name} - ₹{item.price}/day</option>)}
+                </select>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-5">
+                <div>
+                  <label className={LabelClass}>Rent Date</label>
+                  <input required type="date" className={InputClass}
+                    value={formData.rentDate} onChange={e => setFormData({...formData, rentDate: e.target.value})} />
+                </div>
+                <div>
+                  <label className={LabelClass}>Return Date</label>
+                  <input required type="date" className={InputClass}
+                    value={formData.returnDate} onChange={e => setFormData({...formData, returnDate: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-5 pt-2">
+                <div>
+                  <label className={LabelClass}>Total Price</label>
+                  <div className="relative">
+                    <IndianRupee className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F]/70 stroke-[2]" />
+                    <input required type="number" className={`${InputClass} pl-12 font-serif text-lg`} placeholder="0"
+                      value={formData.totalRent} onChange={e => setFormData({...formData, totalRent: e.target.value})} />
+                  </div>
+                </div>
+                <div>
+                  <label className={LabelClass}>Advance</label>
+                  <div className="relative">
+                    <IndianRupee className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F]/70 stroke-[2]" />
+                    <input required type="number" className={`${InputClass} pl-12 font-serif text-lg`} placeholder="0"
+                      value={formData.advancePaid} onChange={e => setFormData({...formData, advancePaid: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" 
+                disabled={!isPhoneVerified}
+                className={`w-full font-bold tracking-[0.2em] uppercase text-[11px] rounded-2xl mt-10 transition-all flex justify-center items-center gap-2 h-14 ${isPhoneVerified ? 'glass-btn-primary text-white active:scale-95' : 'bg-white/30 backdrop-blur-sm border border-white/40 text-[#AFAAA3] cursor-not-allowed'}`}>
+                 {isPhoneVerified ? 'Confirm Booking' : 'Verify Phone to Book'} 
+                 {isPhoneVerified && <ChevronRight className="w-4 h-4 stroke-[2.5]"/>}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    };
+
+    const LoginPage = ({ loginForm, setLoginForm, setIsAuthenticated }) => {
+      const [showOtpInput, setShowOtpInput] = useState(false);
+      const [otp, setOtp] = useState('');
+      const [isVerifying, setIsVerifying] = useState(false);
+      const [generatedOtp, setGeneratedOtp] = useState('');
+      
+      const [isRegistering, setIsRegistering] = useState(false);
+      const [businessName, setBusinessName] = useState('');
+      const [adminName, setAdminName] = useState('');
+      const [accountChecked, setAccountChecked] = useState(false);
+
+      const triggerOtp = () => {
+        const newOtp = Math.floor(1000 + Math.random() * 9000).toString();
+        setGeneratedOtp(newOtp);
+        setShowOtpInput(true);
+        
+        const sendRealSMS = async () => {
+          try {
+            const apiKey = 'u1UqlX4x3Z6Prv5BN8jnFCpmDMhesIoOJdA7bQyEVck0LKGYWwwK3X2GNsoLDn1JemCkZEH9bOvpjrBa'; 
+            if (apiKey === 'YOUR_FAST2SMS_API_KEY') {
+              console.log(`[Developer Trace] SMS API Key not set. The OTP generated for +91 ${loginForm.phone} is: ${newOtp}`);
+              return;
+            }
+            const response = await fetch(`https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&variables_values=${newOtp}&route=otp&numbers=${loginForm.phone}`);
+            const data = await response.json();
+            console.log("SMS Gateway Response:", data);
+          } catch (err) {
+            console.error("SMS Failed to Send:", err);
+          }
+        };
+        sendRealSMS();
+      };
+
+      const handleLogin = (e) => {
+        e.preventDefault();
+        
+        if (!accountChecked) {
+          if (loginForm.phone.length >= 10) {
+            const existingNum = localStorage.getItem(`luxury_crm_user_${loginForm.phone}`);
+            if (!existingNum) {
+              setAccountChecked(true);
+              setIsRegistering(true);
+              return;
+            } else {
+              setAccountChecked(true);
+              setIsRegistering(false);
+              triggerOtp();
+            }
+          }
+          return;
+        }
+
+        if (isRegistering && !showOtpInput) {
+            if (businessName.trim() && adminName.trim()) {
+                triggerOtp();
+            } else {
+                alert("Please fill in your Business Name and Admin Name to create your account.");
+            }
+            return;
+        }
+
+        if (otp.length >= 4) {
+          setIsVerifying(true);
+          setTimeout(() => {
+            setIsVerifying(false);
+            if (otp === generatedOtp) {
+              if (isRegistering) {
+                 localStorage.setItem(`luxury_crm_user_${loginForm.phone}`, JSON.stringify({
+                     businessName: businessName.trim(),
+                     adminName: adminName.trim(),
+                     phone: loginForm.phone
+                 }));
+              }
+              localStorage.setItem('active_luxury_crm_user', loginForm.phone);
+              setIsAuthenticated(true);
+            } else {
+              alert('Invalid OTP Code. Please verify the code sent to your device.');
+              setOtp('');
+            }
+          }, 800);
+        }
+      };
+
+      return (
+        <div className="min-h-screen relative max-w-md mx-auto shadow-[0_0_60px_rgba(0,0,0,0.1)] overflow-x-hidden bg-[#FAF8F5] flex flex-col justify-center px-8 z-10 hover:shadow-2xl transition-shadow duration-500">
+          {/* Background elements */}
+          <div className="fixed inset-0 pointer-events-none z-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmYiLz48cmVjdCB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZjBmMGYwIi8+PC9zdmc+')] opacity-50 mix-blend-multiply"></div>
+          <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-transparent to-transparent z-0 pointer-events-none"></div>
+          <div className="absolute -right-20 -top-20 w-64 h-64 bg-[#C6A87C]/20 rounded-full blur-[60px] pointer-events-none animate-pulse"></div>
+          <div className="absolute -left-20 bottom-20 w-64 h-64 bg-[#E8D3B9]/30 rounded-full blur-[60px] pointer-events-none animate-pulse"></div>
+
+          <div className="relative z-10 text-center mb-12 transform hover:scale-105 transition-transform duration-500">
+            <div className="w-20 h-20 mx-auto bg-white/80 rounded-full border border-[#EAE2D6] shadow-[0_10px_30px_rgba(181,145,95,0.2)] flex items-center justify-center mb-6">
+              <Award className="w-10 h-10 text-[#B5915F] stroke-[1.5]" />
+            </div>
+            <h1 className="text-3xl tracking-[0.2em] font-serif gold-gradient-text font-bold mb-2 uppercase">
+              Luxe<span className="text-[#8C8477] font-sans tracking-[0.3em] font-medium text-[16px] ml-1">Rentals</span>
+            </h1>
+            <p className="text-[#A67E48] font-serif italic text-sm tracking-widest opacity-80">Premium Collection CRM</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="glass-card soft-shadow rounded-[2.5rem] p-8 relative z-10 border border-[#C6A87C]/30 hover:border-[#C6A87C]/50 transition-colors duration-500 backdrop-blur-2xl">
+            <h2 className="text-lg font-serif text-[#2D2825] mb-8 tracking-widest text-center uppercase font-bold">Secure Access</h2>
+            
+            <div className="space-y-6">
+              <div className="group">
+                <label className="block text-[9px] tracking-[0.25em] uppercase text-[#7A736A] mb-2.5 font-bold ml-1 group-focus-within:text-[#B5915F] transition-colors">Phone Number</label>
+                <div className="relative">
+                  <Phone className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F]/70 stroke-[2] group-focus-within:text-[#B5915F] transition-colors" />
+                  <span className="absolute left-11 top-1/2 -translate-y-1/2 text-[#2D2825] font-bold text-[13px] font-sans">+91</span>
+                  <input required type="tel" maxLength={10} placeholder="Enter your 10-digit number" 
+                    className="w-full bg-white/70 border border-[#C6A87C]/20 rounded-[1.5rem] pl-20 pr-5 py-4 text-[#2D2825] focus:border-[#C6A87C] focus:bg-white outline-none transition-all shadow-inner text-sm font-medium tracking-wide placeholder:text-[#AFAAA3] disabled:opacity-60"
+                    value={loginForm.phone} 
+                    onChange={e => {
+                        setLoginForm({...loginForm, phone: e.target.value.replace(/\D/g, '')});
+                        setShowOtpInput(false);
+                        setOtp('');
+                        setAccountChecked(false);
+                        setIsRegistering(false);
+                    }} 
+                    disabled={showOtpInput || (accountChecked && isRegistering)}
+                  />
+                  {(showOtpInput || (accountChecked && isRegistering)) && (
+                    <button type="button" onClick={() => { setShowOtpInput(false); setOtp(''); setAccountChecked(false); setIsRegistering(false); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#B5915F] text-[10px] font-bold uppercase tracking-widest hover:text-[#2D2825] transition-colors">
+                      Edit
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {isRegistering && !showOtpInput && (
+                <div className="space-y-5 animate-[fadeIn_0.5s_ease-out]">
+                  <div className="group">
+                    <label className="block text-[9px] tracking-[0.25em] uppercase text-[#7A736A] mb-2.5 font-bold ml-1 group-focus-within:text-[#B5915F] transition-colors">Business Name</label>
+                    <div className="relative">
+                      <Award className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F]/70 stroke-[2] group-focus-within:text-[#B5915F] transition-colors" />
+                      <input required type="text" placeholder="e.g. Luxe Rentals" 
+                        className="w-full bg-white/70 border border-[#C6A87C]/20 rounded-[1.5rem] pl-14 pr-5 py-4 text-[#2D2825] focus:border-[#C6A87C] focus:bg-white outline-none transition-all shadow-inner text-sm font-medium tracking-wide placeholder:text-[#AFAAA3]"
+                        value={businessName} onChange={e => setBusinessName(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="group">
+                    <label className="block text-[9px] tracking-[0.25em] uppercase text-[#7A736A] mb-2.5 font-bold ml-1 group-focus-within:text-[#B5915F] transition-colors">Admin Name</label>
+                    <div className="relative">
+                      <User className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F]/70 stroke-[2] group-focus-within:text-[#B5915F] transition-colors" />
+                      <input required type="text" placeholder="Your Full Name" 
+                        className="w-full bg-white/70 border border-[#C6A87C]/20 rounded-[1.5rem] pl-14 pr-5 py-4 text-[#2D2825] focus:border-[#C6A87C] focus:bg-white outline-none transition-all shadow-inner text-sm font-medium tracking-wide placeholder:text-[#AFAAA3]"
+                        value={adminName} onChange={e => setAdminName(e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showOtpInput && (
+                <div className="mt-4 p-5 rounded-2xl bg-gradient-to-br from-[#FAF8F5] to-white border border-[#C6A87C]/30 shadow-inner block animate-[fadeIn_0.3s_ease-out]">
+                  <label className="block text-[9px] tracking-[0.2em] uppercase text-[#B5915F] mb-3 font-bold ml-1 text-center">
+                    Enter OTP sent to +91 {loginForm.phone}
+                  </label>
+                  <input 
+                    type="text" 
+                    maxLength={4}
+                    autoFocus
+                    className="w-full bg-white/70 border border-[#C6A87C]/40 rounded-xl px-4 py-3 text-[#2D2825] focus:border-[#C6A87C] outline-none text-center font-serif text-2xl tracking-[0.7em] shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all"
+                    placeholder="••••"
+                    value={otp}
+                    onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                  />
+                </div>
+              )}
+
+              <div className="pt-4">
+                <button type="submit" disabled={showOtpInput && otp.length < 4} className={`w-full font-bold tracking-[0.25em] uppercase text-[11px] py-4 rounded-[1.5rem] transition-all duration-300 flex justify-center items-center gap-2 ${showOtpInput && otp.length < 4 ? 'bg-white/30 backdrop-blur-sm border border-[#C6A87C]/20 text-[#AFAAA3] cursor-not-allowed' : 'glass-btn-primary text-white shadow-[0_10px_30px_rgba(181,145,95,0.3)] hover:shadow-[0_15px_40px_rgba(181,145,95,0.4)] active:scale-95'}`}>
+                  {isVerifying ? 'Verifying...' : showOtpInput ? 'Verify OTP & Enter' : (isRegistering ? 'Register Profile & Send OTP' : 'Continue')} <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <p className="text-center text-[#A67E48] text-[9px] tracking-[0.3em] uppercase mt-12 relative z-10 font-bold opacity-60">
+            Strictly Authorized Accounts
+          </p>
+        </div>
+      );
+    };
+
     function App() {
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [loginForm, setLoginForm] = useState({ phone: '', password: '' });
@@ -225,269 +674,7 @@
         </div>
       );
 
-      const CalendarTab = () => {
-        // Find most recent rent date to default to, or today's date
-        const defaultDate = rents.length > 0 
-          ? [...rents].sort((a, b) => new Date(b.rentDate) - new Date(a.rentDate))[0].rentDate 
-          : new Date().toISOString().split('T')[0];
-          
-        const [selectedDate, setSelectedDate] = useState(defaultDate);
-        const rentsOnDate = rents.filter(r => r.rentDate === selectedDate);
-        
-        return (
-          <div className="p-6 pb-32 space-y-6">
-            <h2 className="text-[#8C8477] text-xs font-serif tracking-[0.2em] uppercase flex items-center gap-3 mb-8">
-              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C6A87C]/50"></span>
-              Date Explorer
-            </h2>
 
-            <div className="glass-card soft-shadow rounded-[2rem] p-6 text-center border-[#C6A87C]/20 mb-10 bg-gradient-to-br from-white to-[#FAF8F5]">
-              <label className="text-[10px] tracking-[0.2em] uppercase text-[#A67E48] mb-4 font-bold block flex justify-center items-center gap-2">
-                <CalendarDays className="w-3.5 h-3.5 stroke-[2]"/> Select a Date
-              </label>
-              <input 
-                type="date" 
-                className="w-full bg-white border border-[#C6A87C]/40 rounded-xl px-4 py-4 text-[#2D2825] focus:border-[#C6A87C] outline-none text-center font-serif text-lg shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all cursor-pointer"
-                value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
-              />
-            </div>
-
-            <h3 className="text-[#A67E48] font-bold text-[11px] tracking-[0.2em] uppercase mb-5 pl-3 border-l-[3px] border-[#B5915F] flex items-center justify-between">
-              <span className="flex items-center gap-2"><ClipboardList className="w-3.5 h-3.5 stroke-[2]"/> Outgoing on this Day</span>
-              <span className="bg-[#FAF8F5] px-3 py-1 rounded-full border border-[#EAE2D6] text-[#8C8477] text-[9px] font-sans tracking-widest">{rentsOnDate.length}</span>
-            </h3>
-
-            {rentsOnDate.length === 0 ? (
-              <p className="text-[#8C8477] text-center py-16 font-serif italic tracking-wider">No items were rented out on this date.</p>
-            ) : (
-              <div className="space-y-4">
-                {rentsOnDate.map(rent => (
-                  <div key={rent.id} className="glass-card soft-shadow rounded-[1.5rem] p-5 relative overflow-hidden border border-[#C6A87C]/10 hover:border-[#C6A87C]/30 transition-colors group">
-                    
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h4 className="font-serif text-[#2D2825] text-lg tracking-wider font-semibold">{rent.customerName}</h4>
-                        <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[8px] uppercase tracking-[0.25em] font-bold shadow-sm ${rent.status === 'active' ? 'bg-[#FAF6EC] text-[#B5915F] border border-[#C6A87C]/30' : 'bg-[#F2F8F4] text-[#6A9576] border border-[#8DBA9C]/40'}`}>
-                          {rent.status}
-                        </span>
-                      </div>
-                      <div className="text-right max-w-[50%]">
-                        <span className="bg-[#FAF8F5] border border-[#EAE2D6] text-[#6A6359] px-3 py-1 rounded-full text-[8px] uppercase tracking-[0.2em] font-bold block mb-2 truncate" title={rent.item.name}>
-                          {rent.item.name}
-                        </span>
-                        <p className="text-[#D96B6B] text-[8px] font-bold tracking-widest uppercase flex items-center justify-end gap-1 pt-1 opacity-90">
-                          Due: {rent.returnDate}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 pt-3 border-t border-[#EAE2D6]/70">
-                      <div className="flex justify-between items-center text-[10px] tracking-widest uppercase">
-                        <span className="text-[#8C8477]">Total Value</span>
-                        <span className="text-[#2D2825] font-serif tracking-widest font-semibold text-sm">₹{rent.totalRent}</span>
-                      </div>
-                      {rent.pendingAmount > 0 && rent.status === 'active' && (
-                        <div className="flex justify-between items-center text-[10px] tracking-widest uppercase">
-                          <span className="text-[#B5915F] font-bold">Pending Dues</span>
-                          <span className="font-serif tracking-widest font-bold text-[#B5915F] text-[13px]">₹{rent.pendingAmount}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      };
-
-      const NewRentForm = () => {
-        const [formData, setFormData] = useState({ customerName: '', phone: '', itemId: draftItemId, rentDate: '', returnDate: '', totalRent: '', advancePaid: '' });
-        const [idProof, setIdProof] = useState(null);
-
-        // Mobile Verification State
-        const [isPhoneVerified, setIsPhoneVerified] = useState(false);
-        const [showOtpInput, setShowOtpInput] = useState(false);
-        const [otp, setOtp] = useState('');
-        const [isVerifying, setIsVerifying] = useState(false);
-
-        const activeItemIds = rents.filter(r => r.status === 'active').map(r => r.item.id);
-        const availableInventory = inventory.filter(item => !activeItemIds.includes(item.id));
-
-        const handleImageUpload = (e) => {
-          const file = e.target.files[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => setIdProof(reader.result);
-            reader.readAsDataURL(file);
-          }
-        };
-
-        const handleSubmit = (e) => {
-          e.preventDefault();
-          if (!isPhoneVerified) return alert('Please verify the contact number first!');
-          const item = inventory.find(i => i.id === parseInt(formData.itemId));
-          if (!item) return alert('Please select an item!');
-          const total = parseInt(formData.totalRent || 0);
-          const advance = parseInt(formData.advancePaid || 0);
-
-          setRents([...rents, {
-            id: Date.now(), customerName: formData.customerName, phone: formData.phone, item,
-            rentDate: formData.rentDate, returnDate: formData.returnDate, totalRent: total, pendingAmount: total - advance, status: 'active', idProof
-          }]);
-          setDraftItemId('');
-          setActiveTab('Home');
-        };
-
-        const InputClass = "w-full bg-white/70 border border-[#C6A87C]/20 rounded-2xl px-5 py-4 text-[#2D2825] placeholder-[#B5915F]/40 focus:border-[#C6A87C] focus:ring-1 focus:ring-[#C6A87C]/40 focus:bg-white outline-none transition-all text-sm tracking-wide font-medium shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]";
-        const LabelClass = "block text-[10px] tracking-[0.2em] uppercase text-[#7A736A] mb-2.5 font-bold ml-1";
-
-        return (
-          <div className="p-6 pb-32">
-            <h2 className="text-[#8C8477] text-xs font-serif tracking-[0.2em] uppercase mb-8 flex items-center gap-3">
-              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C6A87C]/50"></span>
-              New Booking
-            </h2>
-
-            <div className="glass-card soft-shadow border-[#C6A87C]/20 rounded-[2rem] p-7 relative">
-              
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div>
-                  <label className={LabelClass}>Client Name</label>
-                  <input required type="text" className={InputClass} placeholder="Enter full name"
-                    value={formData.customerName} onChange={e => setFormData({...formData, customerName: e.target.value})} />
-                </div>
-                <div>
-                  <label className={LabelClass}>Contact Number</label>
-                  <div className="flex gap-3">
-                    <input required type="tel" className={`${InputClass} flex-1`} placeholder="+91"
-                      value={formData.phone} 
-                      onChange={e => {
-                        setFormData({...formData, phone: e.target.value});
-                        setIsPhoneVerified(false);
-                        setShowOtpInput(false);
-                        setOtp('');
-                      }} 
-                      disabled={isPhoneVerified}
-                    />
-                    {!isPhoneVerified && formData.phone.length >= 10 && (
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          if(!showOtpInput) {
-                            setShowOtpInput(true);
-                          } else if(otp.length >= 4) {
-                            setIsVerifying(true);
-                            setTimeout(() => {
-                              setIsVerifying(false);
-                              setIsPhoneVerified(true);
-                              setShowOtpInput(false);
-                            }, 800);
-                          }
-                        }}
-                        className={`glass-btn text-[#A67E48] px-5 rounded-2xl font-bold tracking-[0.2em] text-[10px] uppercase transition-all ${showOtpInput && otp.length < 4 ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
-                        disabled={showOtpInput && otp.length < 4}
-                      >
-                        {isVerifying ? '...' : showOtpInput ? 'Verify' : 'Send OTP'}
-                      </button>
-                    )}
-                    {isPhoneVerified && (
-                      <div className="bg-[#FAF8F5] border border-[#EAE2D6] px-5 rounded-2xl flex items-center justify-center shadow-sm">
-                        <CheckCircle className="w-5 h-5 text-[#8DBA9C]" />
-                      </div>
-                    )}
-                  </div>
-                  
-                  {showOtpInput && !isPhoneVerified && (
-                    <div className="mt-4 p-5 rounded-2xl bg-gradient-to-br from-[#FAF8F5] to-white border border-[#C6A87C]/30 shadow-inner block animate-[fadeIn_0.3s_ease-out]">
-                      <label className="block text-[9px] tracking-[0.2em] uppercase text-[#B5915F] mb-3 font-bold ml-1 text-center">
-                        Enter 4-digit OTP (Simulated)
-                      </label>
-                      <input 
-                        type="text" 
-                        maxLength="4"
-                        className="w-full bg-white/70 border border-[#C6A87C]/40 rounded-xl px-4 py-3 text-[#2D2825] focus:border-[#C6A87C] outline-none text-center font-serif text-2xl tracking-[0.7em] shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all"
-                        placeholder="••••"
-                        value={otp}
-                        onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                      />
-                    </div>
-                  )}
-                </div>
-                
-                <div>
-                  <label className={LabelClass}>Identity Document</label>
-                  {idProof ? (
-                    <div className="relative rounded-2xl overflow-hidden border border-[#C6A87C]/30 shadow-md group">
-                      <img src={idProof} alt="ID Preview" className="w-full h-40 object-cover transition-all group-hover:scale-105" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-                      <button type="button" onClick={() => setIdProof(null)} className="absolute top-3 right-3 bg-white/80 backdrop-blur border border-[#EAE2D6] p-2.5 rounded-full text-[#2D2825] hover:bg-white transition-all hover:scale-110 shadow-sm">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center w-full h-36 border border-dashed border-[#C6A87C]/40 bg-white/50 hover:bg-white transition-colors rounded-2xl cursor-pointer group shadow-sm">
-                      <div className="w-12 h-12 rounded-full border border-[#C6A87C]/20 bg-[#FAF8F5] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-[0_4px_10px_rgba(181,145,95,0.1)]">
-                        <Upload className="w-5 h-5 text-[#B5915F] stroke-[1.5]" />
-                      </div>
-                      <p className="text-[10px] tracking-[0.2em] text-[#B5915F]/80 uppercase font-bold">Capture or Upload ID</p>
-                    </label>
-                  )}
-                </div>
-
-                <div>
-                  <label className={LabelClass}>Select Garment</label>
-                  <select required className={`${InputClass} appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23B5915F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:1.2em] bg-[right_1rem_center] bg-no-repeat pr-12`}
-                    value={formData.itemId} onChange={e => setFormData({...formData, itemId: e.target.value})}>
-                    <option value="" className="text-[#6A6359]">-- Choose from Collection --</option>
-                    {availableInventory.map(item => <option key={item.id} value={item.id}>{item.name} - ₹{item.price}/day</option>)}
-                  </select>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-5">
-                  <div>
-                    <label className={LabelClass}>Rent Date</label>
-                    <input required type="date" className={InputClass}
-                      value={formData.rentDate} onChange={e => setFormData({...formData, rentDate: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className={LabelClass}>Return Date</label>
-                    <input required type="date" className={InputClass}
-                      value={formData.returnDate} onChange={e => setFormData({...formData, returnDate: e.target.value})} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-5 pt-2">
-                  <div>
-                    <label className={LabelClass}>Total Price</label>
-                    <div className="relative">
-                      <IndianRupee className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F]/70 stroke-[2]" />
-                      <input required type="number" className={`${InputClass} pl-12 font-serif text-lg`} placeholder="0"
-                        value={formData.totalRent} onChange={e => setFormData({...formData, totalRent: e.target.value})} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={LabelClass}>Advance</label>
-                    <div className="relative">
-                      <IndianRupee className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F]/70 stroke-[2]" />
-                      <input required type="number" className={`${InputClass} pl-12 font-serif text-lg`} placeholder="0"
-                        value={formData.advancePaid} onChange={e => setFormData({...formData, advancePaid: e.target.value})} />
-                    </div>
-                  </div>
-                </div>
-
-                <button type="submit" 
-                  disabled={!isPhoneVerified}
-                  className={`w-full font-bold tracking-[0.2em] uppercase text-[11px] rounded-2xl mt-10 transition-all flex justify-center items-center gap-2 h-14 ${isPhoneVerified ? 'glass-btn-primary text-white active:scale-95' : 'bg-white/30 backdrop-blur-sm border border-white/40 text-[#AFAAA3] cursor-not-allowed'}`}>
-                   {isPhoneVerified ? 'Confirm Booking' : 'Verify Phone to Book'} 
-                   {isPhoneVerified && <ChevronRight className="w-4 h-4 stroke-[2.5]"/>}
-                </button>
-              </form>
-            </div>
-          </div>
-        );
-      };
 
       const StockTab = () => {
         const [showAddForm, setShowAddForm] = useState(false);
@@ -719,73 +906,7 @@
           </div>
         );
       };
-
-      const LoginPage = () => {
-        const handleLogin = (e) => {
-          e.preventDefault();
-          if (loginForm.phone && loginForm.password) {
-            setIsAuthenticated(true);
-          }
-        };
-
-        return (
-          <div className="min-h-screen relative max-w-md mx-auto shadow-[0_0_60px_rgba(0,0,0,0.1)] overflow-x-hidden bg-[#FAF8F5] flex flex-col justify-center px-8 z-10 hover:shadow-2xl transition-shadow duration-500">
-            {/* Background elements */}
-            <div className="fixed inset-0 pointer-events-none z-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmYiLz48cmVjdCB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZjBmMGYwIi8+PC9zdmc+')] opacity-50 mix-blend-multiply"></div>
-            <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-transparent to-transparent z-0 pointer-events-none"></div>
-            <div className="absolute -right-20 -top-20 w-64 h-64 bg-[#C6A87C]/20 rounded-full blur-[60px] pointer-events-none animate-pulse"></div>
-            <div className="absolute -left-20 bottom-20 w-64 h-64 bg-[#E8D3B9]/30 rounded-full blur-[60px] pointer-events-none animate-pulse"></div>
-
-            <div className="relative z-10 text-center mb-12 transform hover:scale-105 transition-transform duration-500">
-              <div className="w-20 h-20 mx-auto bg-white/80 rounded-full border border-[#EAE2D6] shadow-[0_10px_30px_rgba(181,145,95,0.2)] flex items-center justify-center mb-6">
-                <Award className="w-10 h-10 text-[#B5915F] stroke-[1.5]" />
-              </div>
-              <h1 className="text-3xl tracking-[0.2em] font-serif gold-gradient-text font-bold mb-2 uppercase">
-                Luxe<span className="text-[#8C8477] font-sans tracking-[0.3em] font-medium text-[16px] ml-1">Rentals</span>
-              </h1>
-              <p className="text-[#A67E48] font-serif italic text-sm tracking-widest opacity-80">Premium Collection CRM</p>
-            </div>
-
-            <form onSubmit={handleLogin} className="glass-card soft-shadow rounded-[2.5rem] p-8 relative z-10 border border-[#C6A87C]/30 hover:border-[#C6A87C]/50 transition-colors duration-500 backdrop-blur-2xl">
-              <h2 className="text-lg font-serif text-[#2D2825] mb-8 tracking-widest text-center uppercase font-bold">Secure Access</h2>
-              
-              <div className="space-y-6">
-                <div className="group">
-                  <label className="block text-[9px] tracking-[0.25em] uppercase text-[#7A736A] mb-2.5 font-bold ml-1 group-focus-within:text-[#B5915F] transition-colors">Phone Number</label>
-                  <div className="relative">
-                    <Phone className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F]/70 stroke-[2] group-focus-within:text-[#B5915F] transition-colors" />
-                    <input required type="tel" placeholder="Enter your 10-digit number" 
-                      className="w-full bg-white/70 border border-[#C6A87C]/20 rounded-[1.5rem] pl-14 pr-5 py-4 text-[#2D2825] focus:border-[#C6A87C] focus:bg-white outline-none transition-all shadow-inner text-sm font-medium tracking-wide placeholder:text-[#AFAAA3]"
-                      value={loginForm.phone} onChange={e => setLoginForm({...loginForm, phone: e.target.value})} />
-                  </div>
-                </div>
-
-                <div className="group">
-                  <label className="block text-[9px] tracking-[0.25em] uppercase text-[#7A736A] mb-2.5 font-bold ml-1 group-focus-within:text-[#B5915F] transition-colors">Access Pin Code</label>
-                  <div className="relative">
-                    <User className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B5915F]/70 stroke-[2] group-focus-within:text-[#B5915F] transition-colors" />
-                    <input required type="password" placeholder="••••••" 
-                      className="w-full bg-white/70 border border-[#C6A87C]/20 rounded-[1.5rem] pl-14 pr-5 py-4 text-[#2D2825] focus:border-[#C6A87C] focus:bg-white outline-none transition-all shadow-inner text-sm font-medium tracking-widest placeholder:text-[#AFAAA3]"
-                      value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                  <button type="submit" className="w-full glass-btn-primary text-white font-bold tracking-[0.25em] uppercase text-[11px] py-4 rounded-[1.5rem] shadow-[0_10px_30px_rgba(181,145,95,0.3)] hover:shadow-[0_15px_40px_rgba(181,145,95,0.4)] transition-all duration-300 active:scale-95 flex justify-center items-center gap-2">
-                    Verify & Enter <ChevronRight className="w-4 h-4 stroke-[2.5]" />
-                  </button>
-                </div>
-              </div>
-            </form>
-
-            <p className="text-center text-[#A67E48] text-[9px] tracking-[0.3em] uppercase mt-12 relative z-10 font-bold opacity-60">
-              Strictly Authorized Accounts
-            </p>
-          </div>
-        );
-      };
-
-      if (!isAuthenticated) return <LoginPage />;
+      if (!isAuthenticated) return <LoginPage loginForm={loginForm} setLoginForm={setLoginForm} setIsAuthenticated={setIsAuthenticated} />;
 
       return (
         <div className="min-h-screen relative max-w-md mx-auto shadow-[0_0_80px_rgba(0,0,0,0.15)] overflow-x-hidden bg-[#FAF8F5] animate-[fadeIn_0.5s_ease-out]">
@@ -797,23 +918,46 @@
           <div className="sticky top-0 z-50 bg-white/70 backdrop-blur-2xl border-b border-[#EAE2D6] px-6 py-5 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2">
               <Award className="w-4 h-4 text-[#B5915F] stroke-[1]" />
-              <h1 className="text-[16px] tracking-[0.25em] font-serif gold-gradient-text font-bold mt-0.5">
-                LUXE<span className="text-[#8C8477] font-sans tracking-[0.3em] font-medium text-[9px] ml-1">RENTALS</span>
+              <h1 className="text-[16px] tracking-[0.25em] font-serif gold-gradient-text font-bold mt-0.5 uppercase truncate max-w-[120px]">
+                {(() => {
+                  try {
+                    const activePhone = localStorage.getItem('active_luxury_crm_user');
+                    if (activePhone) {
+                      const userDataStr = localStorage.getItem(`luxury_crm_user_${activePhone}`);
+                      if (userDataStr) {
+                         const userData = JSON.parse(userDataStr);
+                         return userData.businessName;
+                      }
+                    }
+                  } catch (e) {}
+                  return "LUXERENTALS";
+                })()}
               </h1>
             </div>
-            <button 
-              onClick={() => setUserRole(userRole === 'Admin' ? 'Team' : 'Admin')}
-              className="glass-btn px-4 py-2 rounded-full flex justify-center items-center cursor-pointer gap-2"
-            >
-              <User className="w-3 h-3 text-[#B5915F] stroke-[2]" />
-              <span className="text-[9px] font-bold text-[#A67E48] tracking-widest uppercase">{userRole}</span>
-            </button>
+            <div className="flex gap-2 items-center">
+              {userRole === 'Admin' && (
+                <a 
+                  href="./super-admin-page/index.html"
+                  title="Open Super Admin Portal"
+                  className="glass-btn px-3 py-2 rounded-full flex justify-center items-center cursor-pointer opacity-90 hover:opacity-100 transition-all hover:scale-105 shadow-sm"
+                >
+                  <Award className="w-3.5 h-3.5 text-[#B5915F] stroke-[2]" />
+                </a>
+              )}
+              <button 
+                onClick={() => setUserRole(userRole === 'Admin' ? 'Team' : 'Admin')}
+                className="glass-btn px-4 py-2 rounded-full flex justify-center items-center cursor-pointer gap-2 transition-all hover:scale-105"
+              >
+                <User className="w-3 h-3 text-[#B5915F] stroke-[2]" />
+                <span className="text-[9px] font-bold text-[#A67E48] tracking-widest uppercase">{userRole}</span>
+              </button>
+            </div>
           </div>
 
           <main className="min-h-[calc(100vh-140px)] relative z-10 container mx-auto">
             {activeTab === 'Home' && renderHome()}
-            {activeTab === 'Calendar' && <CalendarTab />}
-            {activeTab === 'New' && <NewRentForm />}
+            {activeTab === 'Calendar' && <CalendarTab rents={rents} />}
+            {activeTab === 'New' && <NewRentForm inventory={inventory} rents={rents} setRents={setRents} draftItemId={draftItemId} setDraftItemId={setDraftItemId} setActiveTab={setActiveTab} />}
             {activeTab === 'Stock' && <StockTab />}
             {activeTab === 'Reports' && <AnalyticsTab />}
           </main>
