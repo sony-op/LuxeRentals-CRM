@@ -59,7 +59,11 @@ def process_whatsapp_message(message_data: dict):
         base_url = "http://localhost:8000" 
         
         if message_type == "text":
-            text_body = message["text"].get("body", "").lower()
+            text_body_raw = message["text"].get("body", "")
+            text_body = text_body_raw.lower().strip()
+            
+            editing_item = db.query(PendingListing).filter(PendingListing.user_id == user.id, PendingListing.status == "editing").order_by(PendingListing.id.desc()).first()
+            
             if text_body in ("hi", "hello"):
                 welcome_msg = "Welcome to WhatsApp-first AI E-commerce Manager! 🤖👔\n\n"
                 if not has_amazon:
@@ -80,7 +84,7 @@ def process_whatsapp_message(message_data: dict):
                     return
                 
                 # Fetch pending listing
-                pending = db.query(PendingListing).filter(PendingListing.user_id == user.id, PendingListing.status == "pending").order_by(PendingListing.id.desc()).first()
+                pending = db.query(PendingListing).filter(PendingListing.user_id == user.id, PendingListing.status.in_(["pending", "editing"])).order_by(PendingListing.id.desc()).first()
                 if not pending:
                     send_whatsapp_message(from_number, "I couldn't find any recent product scans to list. Please send a new image!")
                     return
@@ -104,8 +108,51 @@ def process_whatsapp_message(message_data: dict):
                 
                 send_whatsapp_message(from_number, f"✅ *Successfully Listed!*\nAmazon SKU: {pending.sku}\nListing Status: {result['status']}")
                 return
+            elif text_body in ("2", "edit", "edit details", "edit overview"):
+                pending = db.query(PendingListing).filter(PendingListing.user_id == user.id, PendingListing.status == "pending").order_by(PendingListing.id.desc()).first()
+                if not pending:
+                    send_whatsapp_message(from_number, "No recent product scans found to edit.")
+                    return
+                
+                pending.status = "editing"
+                db.commit()
+                
+                edit_msg = (
+                    "✏️ *Edit Mode Active*\n\n"
+                    "Reply with what you want to change:\n"
+                    "- To change price: `Price 500`\n"
+                    "- To change title: `Title New Product Name`\n"
+                    "- To change description: `Desc Great product...`\n\n"
+                    "When done, reply *1* to approve and list."
+                )
+                send_whatsapp_message(from_number, edit_msg)
+                return
+                
+            elif editing_item and any(text_body.startswith(prefix) for prefix in ["price ", "title ", "desc "]):
+                if text_body.startswith("price "):
+                    try:
+                        new_price = float(text_body.replace("price ", "").strip())
+                        editing_item.pricing_data = {**editing_item.pricing_data, "suggested_price": new_price}
+                        db.commit()
+                        send_whatsapp_message(from_number, f"✅ Price updated to ₹{new_price}.\n\nReply *1* to approve or continue editing.")
+                    except ValueError:
+                        send_whatsapp_message(from_number, "⚠️ Invalid price format. Try: `Price 500`.")
+                elif text_body.startswith("title "):
+                    new_title = text_body_raw[6:].strip() # Keep original case
+                    editing_item.ai_data = {**editing_item.ai_data, "title": new_title}
+                    db.commit()
+                    send_whatsapp_message(from_number, f"✅ Title updated to:\n{new_title}\n\nReply *1* to approve or continue editing.")
+                elif text_body.startswith("desc "):
+                    new_desc = text_body_raw[5:].strip()
+                    editing_item.ai_data = {**editing_item.ai_data, "description": new_desc}
+                    db.commit()
+                    send_whatsapp_message(from_number, "✅ Description updated.\n\nReply *1* to approve or continue editing.")
+                return
             else:
-                send_whatsapp_message(from_number, "Please send a clear product image to analyze, or type 'Hi' to check your connections.")
+                if editing_item:
+                    send_whatsapp_message(from_number, "⚠️ Didn't recognize that command. To edit, start your message with `Price `, `Title `, or `Desc ` followed by the new value. Or type *1* to approve.")
+                else:
+                    send_whatsapp_message(from_number, "Please send a clear product image to analyze, or type 'Hi' to check your connections.")
                 return
         
         if message_type == "image":
