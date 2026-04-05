@@ -7,6 +7,7 @@ from app.services.scraper import get_average_market_price
 from app.services.pricing import calculate_selling_price
 from app.utils.image_processing import process_product_image
 from app.services.amazon_api import build_amazon_listing_payload, mock_submit_listing_to_sandbox
+from app.services.flipkart_api import build_flipkart_listing_payload, mock_submit_listing_to_flipkart
 from app.core.database import SessionLocal
 from app.models.user import User, EcomCredentials
 from app.models.listing import PendingListing
@@ -79,8 +80,8 @@ def process_whatsapp_message(message_data: dict):
                 send_whatsapp_message(from_number, welcome_msg)
                 return
             elif text_body in ("1", "approve", "approve & list"):
-                if not has_amazon:
-                    send_whatsapp_message(from_number, "⚠️ You need to link your Amazon account first!")
+                if not has_amazon and not has_flipkart:
+                    send_whatsapp_message(from_number, "⚠️ You need to link at least one seller account (Amazon or Flipkart) first!")
                     return
                 
                 # Fetch pending listing
@@ -93,20 +94,38 @@ def process_whatsapp_message(message_data: dict):
                 
                 # Retrieve Credentials
                 amazon_cred = db.query(EcomCredentials).filter(EcomCredentials.user_id == user.id, EcomCredentials.platform == "amazon").first()
+                flipkart_cred = db.query(EcomCredentials).filter(EcomCredentials.user_id == user.id, EcomCredentials.platform == "flipkart").first()
                 
-                # Build payload
-                payload = build_amazon_listing_payload(pending.sku, pending.ai_data, pending.pricing_data)
-                
-                # In FastAPI Background task, synchronous sleep is bad unless in async block, but we are inside synchronous `process_whatsapp_message`.
-                # To call the async mock:
+                # Execute mock network calls
                 loop = asyncio.new_event_loop()
-                result = loop.run_until_complete(mock_submit_listing_to_sandbox(payload, amazon_cred.encrypted_access_token))
+                tasks = []
+                
+                if amazon_cred:
+                    amz_payload = build_amazon_listing_payload(pending.sku, pending.ai_data, pending.pricing_data)
+                    tasks.append(mock_submit_listing_to_sandbox(amz_payload, amazon_cred.encrypted_access_token))
+                    
+                if flipkart_cred:
+                    fk_payload = build_flipkart_listing_payload(pending.sku, pending.ai_data, pending.pricing_data)
+                    tasks.append(mock_submit_listing_to_flipkart(fk_payload, flipkart_cred.encrypted_access_token))
+                
+                results = loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
                 
                 # Update status
                 pending.status = "approved"
                 db.commit()
                 
-                send_whatsapp_message(from_number, f"✅ *Successfully Listed!*\nAmazon SKU: {pending.sku}\nListing Status: {result['status']}")
+                status_texts = []
+                amz_res_idx = 0
+                if amazon_cred:
+                    amz_res = results[amz_res_idx]
+                    status_texts.append(f"Amazon: {amz_res.get('status', 'ERROR') if isinstance(amz_res, dict) else 'ERROR'}")
+                    amz_res_idx += 1
+                if flipkart_cred:
+                    fk_res = results[amz_res_idx]
+                    status_texts.append(f"Flipkart: {fk_res.get('status', 'ERROR') if isinstance(fk_res, dict) else 'ERROR'}")
+                
+                final_msg = f"✅ *Successfully Listed!*\nSKU: {pending.sku}\n" + "\n".join(status_texts)
+                send_whatsapp_message(from_number, final_msg)
                 return
             elif text_body in ("2", "edit", "edit details", "edit overview"):
                 pending = db.query(PendingListing).filter(PendingListing.user_id == user.id, PendingListing.status == "pending").order_by(PendingListing.id.desc()).first()
